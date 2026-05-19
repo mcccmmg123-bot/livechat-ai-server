@@ -321,12 +321,16 @@ const RESPONSE_SCHEMA = {
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true }, { headers: CORS })
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
