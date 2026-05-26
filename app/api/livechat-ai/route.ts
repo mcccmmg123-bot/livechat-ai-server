@@ -821,13 +821,28 @@ export async function POST(req: NextRequest) {
 
     const b = body as Record<string, unknown>
 
-    const rawMsg       = typeof b?.latestCustomerMessage === 'string'
-      ? (b.latestCustomerMessage as string).trim()
-      : typeof b?.message === 'string' ? (b.message as string).trim() : ''
-    const rawConv      = Array.isArray(b?.conversationHistory)
+    // Accept both new field names (latestCustomerMessage / conversationHistory)
+    // and legacy field names (message / conversation) — whichever is present wins.
+    const rawMsg = (
+      (typeof b?.latestCustomerMessage === 'string' ? b.latestCustomerMessage as string : '') ||
+      (typeof b?.message               === 'string' ? b.message               as string : '')
+    ).trim()
+
+    const rawConv: unknown[] = Array.isArray(b?.conversationHistory)
       ? b.conversationHistory as unknown[]
-      : Array.isArray(b?.conversation) ? b.conversation as unknown[] : null
+      : Array.isArray(b?.conversation)
+      ? b.conversation as unknown[]
+      : []
+
     const rawReplyType = typeof b?.replyType === 'string' ? b.replyType.trim().toLowerCase() : 'auto'
+
+    // Only reject when both are missing
+    if (!rawMsg && rawConv.length === 0) {
+      return NextResponse.json(
+        { error: 'Provide latestCustomerMessage (or message) and/or conversationHistory (or conversation)' },
+        { status: 400, headers: CORS },
+      )
+    }
 
     // ── Per-request variation ─────────────────────────────────────────────────
 
@@ -842,8 +857,8 @@ export async function POST(req: NextRequest) {
     let instructions: string
     let aiInput: string
 
-    if (rawMsg && rawConv && rawConv.length > 0) {
-      // Mode A: explicit message + conversation context (primary)
+    if (rawMsg && rawConv.length > 0) {
+      // Mode A: message + conversation context (primary)
       const conversation = rawConv
         .filter((m): m is ConvMessage =>
           m !== null && typeof m === 'object' &&
@@ -856,7 +871,7 @@ export async function POST(req: NextRequest) {
       instructions = INSTRUCTIONS_MSG_WITH_CTX
       aiInput      = seedLine + JSON.stringify({ customerMessage: rawMsg, conversationHistory: conversation }, null, 2)
 
-    } else if (rawConv && rawConv.length > 0) {
+    } else if (rawConv.length > 0) {
       // Mode B: conversation only — AI finds last customer message
       const conversation = rawConv
         .filter((m): m is ConvMessage =>
@@ -869,7 +884,7 @@ export async function POST(req: NextRequest) {
 
       if (!conversation.some(m => m.role === 'customer')) {
         return NextResponse.json(
-          { error: 'conversation contains no customer messages' },
+          { error: 'conversationHistory contains no customer messages' },
           { status: 400, headers: CORS },
         )
       }
@@ -877,16 +892,10 @@ export async function POST(req: NextRequest) {
       instructions = INSTRUCTIONS_CONVERSATION
       aiInput      = seedLine + JSON.stringify(conversation, null, 2)
 
-    } else if (rawMsg) {
-      // Mode C: single message — no context
+    } else {
+      // Mode C: single message only (rawMsg guaranteed non-empty — checked above)
       instructions = INSTRUCTIONS_MESSAGE
       aiInput      = seedLine + rawMsg
-
-    } else {
-      return NextResponse.json(
-        { error: 'Provide "message" (string) and/or "conversation" (array)' },
-        { status: 400, headers: CORS },
-      )
     }
 
     // Append style + anti-repeat + reply-type override
@@ -901,15 +910,13 @@ export async function POST(req: NextRequest) {
     // model cannot miss it, and remember the flag for post-processing.
 
     const BLACKLIST_SIGNAL_RE = /blacklist|ban[\s\-]?id|save\s+wild|permanently[\s\-]blocked|akaun[\s\-]disekat/i
-    const serverDetectedBlacklist = rawConv
-      ? rawConv.some((m: unknown) => {
-          if (!m || typeof m !== 'object') return false
-          const msg = m as { role?: string; text?: string }
-          return msg.role === 'agent'
-            && typeof msg.text === 'string'
-            && BLACKLIST_SIGNAL_RE.test(msg.text)
-        })
-      : false
+    const serverDetectedBlacklist = rawConv.some((m: unknown) => {
+      if (!m || typeof m !== 'object') return false
+      const msg = m as { role?: string; text?: string }
+      return msg.role === 'agent'
+        && typeof msg.text === 'string'
+        && BLACKLIST_SIGNAL_RE.test(msg.text)
+    })
 
     if (serverDetectedBlacklist) {
       instructions += `
