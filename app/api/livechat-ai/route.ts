@@ -821,8 +821,12 @@ export async function POST(req: NextRequest) {
 
     const b = body as Record<string, unknown>
 
-    const rawMsg       = typeof b?.message   === 'string' ? (b.message  as string).trim() : ''
-    const rawConv      = Array.isArray(b?.conversation) ? b.conversation as unknown[] : null
+    const rawMsg       = typeof b?.latestCustomerMessage === 'string'
+      ? (b.latestCustomerMessage as string).trim()
+      : typeof b?.message === 'string' ? (b.message as string).trim() : ''
+    const rawConv      = Array.isArray(b?.conversationHistory)
+      ? b.conversationHistory as unknown[]
+      : Array.isArray(b?.conversation) ? b.conversation as unknown[] : null
     const rawReplyType = typeof b?.replyType === 'string' ? b.replyType.trim().toLowerCase() : 'auto'
 
     // ── Per-request variation ─────────────────────────────────────────────────
@@ -891,6 +895,33 @@ export async function POST(req: NextRequest) {
     const replyTypeExtra = REPLY_TYPE_INSTRUCTIONS[rawReplyType] ?? ''
     if (replyTypeExtra) instructions += replyTypeExtra
 
+    // ── Server-side BLACKLIST detection from conversation history ─────────────
+    // Scan ALL agent messages in rawConv for hard blacklist signals.
+    // If found, inject a high-priority override into the AI instructions so the
+    // model cannot miss it, and remember the flag for post-processing.
+
+    const BLACKLIST_SIGNAL_RE = /blacklist|ban[\s\-]?id|save\s+wild|permanently[\s\-]blocked|akaun[\s\-]disekat/i
+    const serverDetectedBlacklist = rawConv
+      ? rawConv.some((m: unknown) => {
+          if (!m || typeof m !== 'object') return false
+          const msg = m as { role?: string; text?: string }
+          return msg.role === 'agent'
+            && typeof msg.text === 'string'
+            && BLACKLIST_SIGNAL_RE.test(msg.text)
+        })
+      : false
+
+    if (serverDetectedBlacklist) {
+      instructions += `
+
+⚠️ SERVER OVERRIDE — CONFIRMED_BLACKLIST:
+Agent messages in conversationHistory contain a confirmed blacklist/ban signal.
+caseState MUST = "CONFIRMED_BLACKLIST".
+NONE of the 3 replies may contain the words: check / semak / tengok / verify / cek / checking.
+All 3 replies must: (1) state the outcome is final, (2) offer new number registration as only path forward.
+`
+    }
+
     // ── Call OpenAI ───────────────────────────────────────────────────────────
 
     const response = await openai.responses.create({
@@ -939,6 +970,33 @@ export async function POST(req: NextRequest) {
     if (!result.riskLevel)        result.riskLevel        = 'MEDIUM'
     if (!result.conversationGoal) result.conversationGoal = 'soft_retain'
     if (!result.caseState)        result.caseState        = 'NEED_CHECK'
+
+    // ── Server-side CONFIRMED_BLACKLIST enforcement ───────────────────────────
+    // Force caseState regardless of what the AI decided, then scrub any reply
+    // that still contains a "check/semak/tengok" action phrase.
+
+    if (serverDetectedBlacklist) {
+      result.caseState = 'CONFIRMED_BLACKLIST'
+      result.riskLevel = 'HIGH'
+    }
+
+    if (result.caseState === 'CONFIRMED_BLACKLIST') {
+      const BANNED_CHECK_IN_REPLY = /(amoi|saya|i|let\s+me|biar|boleh|cuba)\s+(check|semak|tengok|verify|cek)\b|checking\b|(check|semak|tengok|cek)\s+(sekarang|sekali|balik|semula|lagi)/i
+      const BLACKLIST_FALLBACK    = 'Boss, untuk nombor/account ni memang sudah kena restriction dari system MYKAD99 ya 🙏 Current ID tak boleh digunakan lagi. Kalau boss masih nak main, boleh cuba daftar guna nombor lain ya.'
+
+      result.replies = result.replies.map(r => {
+        if (BANNED_CHECK_IN_REPLY.test(r.text)) {
+          console.log('[livechat-ai] BLACKLIST scrub — replaced bad reply:', r.text.slice(0, 80))
+          return { type: r.type, text: BLACKLIST_FALLBACK, score: 0 }
+        }
+        return r
+      })
+
+      // Re-pick bestReplyIndex: prefer highest-scored non-fallback reply
+      const scores = result.replies.map(r => r.score)
+      const maxScore = Math.max(...scores)
+      result.bestReplyIndex = scores.indexOf(maxScore)
+    }
 
     // Clamp bestReplyIndex to valid range
     if (typeof result.bestReplyIndex !== 'number' || !Number.isInteger(result.bestReplyIndex)
