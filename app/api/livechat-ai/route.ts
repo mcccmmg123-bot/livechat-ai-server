@@ -937,8 +937,6 @@ All 3 replies must: (1) state the outcome is final, (2) offer new number registr
       input:             aiInput,
       temperature:       1.0,
       top_p:             0.95,
-      presence_penalty:  0.9,
-      frequency_penalty: 0.85,
       text: {
         format: {
           type:   'json_schema',
