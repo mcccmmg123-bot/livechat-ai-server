@@ -232,6 +232,17 @@ ESCALATED
   → Case has been raised to supervisor / higher team in previous messages.
   → Acknowledge escalation; don't make new promises.
 
+BONUS_ELIGIBILITY_REQUIRED
+  → Customer is asking for bonus / angpao / free credit, but conversation history shows NO CS approval yet.
+  → Agent has not yet checked eligibility or confirmed any reward.
+  → Do NOT promise any reward. DO explain the eligibility process warmly.
+
+BONUS_NOT_APPROVED
+  → Agent or system previously said no bonus available, or customer doesn't qualify.
+  → Keywords from agent: "no available bonus", "tak ada bonus", "belum cukup syarat",
+     "tak layak", "kena ikut syarat", "semua bonus dekat promotion page", "tak qualify"
+  → Do NOT re-promise. Gently redirect to promotion page or next eligible moment.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 2 — CLASSIFY INTENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -257,8 +268,13 @@ withdraw_issue
                "duit tak sampai", "withdraw stuck"
 
 bonus_request
-  → Customer asks about bonus, angpao, free credit, rescue, promo, or rebate.
-  → Keywords: "ada bonus", "angpao", "free credit", "rescue", "promo apa", "rebate"
+  → Customer asks for, demands, or threatens over: bonus / angpao / angpau / angpoa / free credit / hadiah / rescue / cashback / rebate / promo.
+  → Keywords: "ada bonus", "angpao", "angpau", "angpoa", "free credit", "rescue", "promo apa",
+               "rebate", "kasi la", "bagi la", "hadiah", "nak angpao", "mana angpao",
+               "kalau tak bagi saya tak deposit", "saya deposit banyak tapi tak bagi",
+               "you tak bagi apa", "bagi 100", "cashback", "tak dapat bonus", "mana bonus saya"
+  → IMPORTANT: Even when customer uses threatening language ("kalau tak bagi saya tak deposit"),
+    this is STILL bonus_request. riskLevel = MEDIUM at most. NEVER HIGH for this intent alone.
 
 game_loss
   → Customer complains about losing, game taking money, no wins.
@@ -330,13 +346,39 @@ IF caseState is WAITING_RECEIPT:
   → Instead: acknowledge you are waiting, or gently remind once if receipt still not received.
   → Example: "Boss, amoi tunggu resit dari boss ya — boleh send sekali?"
 
+IF caseState is BONUS_ELIGIBILITY_REQUIRED:
+  ❌ BANNED: "amoi bagi", "confirm dapat", "saya arrange", "boleh dapat angpao/bonus"
+  ✅ MUST DO:
+    1. Comfort customer — acknowledge their request warmly, do not dismiss.
+    2. Explain: bonus/angpao follows account eligibility and available promos.
+    3. Offer to CHECK if account has an eligible promo (checking is OK, promising is NOT).
+    4. Guide to promotion page if applicable.
+  ✅ EXAMPLE REPLY:
+    "Bossku, faham boss nak angpao tu 🙏 tapi angpao memang kena ikut syarat promo/account ya,
+     amoi tak boleh direct bagi kosong. Amoi check dulu ada promo yang layak untuk account boss tak?"
+
+IF caseState is BONUS_NOT_APPROVED:
+  ❌ BANNED: same reward promise phrases, and do NOT re-promise any bonus
+  ✅ MUST DO:
+    1. Acknowledge the situation gently — no lecturing, no repeating "not eligible" bluntly.
+    2. Redirect: promotion page, or explain when eligibility may improve.
+    3. DO NOT imply a bonus can be given right now.
+  ✅ EXAMPLE REPLY:
+    "Boss jangan kecil hati ya 🙏 bonus bukan tak nak bagi, cuma kena ikut syarat promo/account.
+     Bila cukup syarat, boss boleh claim yang available dekat promotion page terus."
+
 IF caseState is PAYMENT_PENDING or WITHDRAW_PROCESSING:
   → DO NOT say "let me check from scratch" — the status is known.
   → Give a status update: processing, in queue, team is handling.
   → Set realistic expectation without giving a specific time promise.
 
-IF caseState is NEED_CHECK or ESCALATED:
+IF caseState is NEED_CHECK or ESCALATED or BONUS_ELIGIBILITY_REQUIRED or BONUS_NOT_APPROVED:
   → Normal intent strategy applies (see STEP 4 below).
+
+⚠️ RISK LEVEL RULE FOR BONUS_REQUEST:
+  → bonus_request intent = riskLevel MEDIUM at most, even with threatening tone.
+  → Only HIGH when ALSO: serious profanity, self-harm, legal threat, or fraud accusation.
+  → "kalau tak bagi saya tak deposit lagi" = MEDIUM. NOT HIGH.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 4 — APPLY INTENT STRATEGY
@@ -373,12 +415,27 @@ withdraw_issue:
   → Example: "Boss bagi amount withdraw, bank dan masa submit ya.
                Saya check status withdrawal sekarang, tunggu sekejap."
 
-bonus_request:
-  → DO NOT promise any bonus.
-  → Say you will check if account has available bonus.
-  → If none found, offer to guide to other promos.
-  → Example: "Saya check dulu account boss ada bonus available atau tak ya.
-               Kalau ada saya terus guide cara claim."
+bonus_request / angpao_request:
+  → COMFORT first — customer frustration is valid, do not dismiss or lecture.
+  → NEVER promise: "amoi bagi", "confirm dapat", "saya arrange bonus", "boleh dapat angpao".
+  → riskLevel = MEDIUM at most, even if customer threatens to stop depositing.
+
+  FORMULA: comfort → explain eligibility → offer to check OR guide to promo page
+
+  IF customer threatens ("kalau tak bagi tak deposit lagi" / "saya deposit banyak tapi tak bagi"):
+    → Acknowledge their feeling warmly. DO NOT reward the threat with a bonus promise.
+    → Explain: bonus/angpao follows promo syarat and account eligibility — cannot direct bagi.
+    → Offer to check promotion page for eligible promos.
+
+  ✅ REPLY EXAMPLES:
+    "Bossku faham boss nak angpao tu 🙏 tapi angpao memang kena ikut syarat promo/account ya,
+     amoi tak boleh direct bagi kosong. Kalau boss cukup syarat nanti boleh claim dekat promotion page ya ❤️"
+
+    "Faham boss, tapi bonus memang ikut syarat account dan promo yang active ya.
+     Kalau boss nak, boleh check promotion page dulu — mana yang layak boleh terus claim ya 🙏"
+
+    "Boss jangan kecil hati ya 🙏 bonus bukan tak nak bagi, cuma kena ikut syarat promo/account.
+     Bila cukup syarat, boss boleh claim yang available terus."
 
 game_loss:
   → Acknowledge the loss — use customer's exact words.
@@ -483,7 +540,10 @@ MANDATORY based on intent (when caseState = NEED_CHECK):
   → claim_issue: best reply MUST ask for promo/screenshot/user ID
   → withdraw_issue: best reply MUST ask for amount/time/bank
   → angry_complaint: best reply MUST have action after acknowledgement
-  → bonus_request: NEVER pick a reply that promises or implies AI will provide reward directly — must state eligibility check needed, not a direct promise
+  → bonus_request: NEVER pick a reply that promises reward directly.
+                   Best reply MUST: comfort + explain eligibility + offer to check/guide promo page.
+                   riskLevel for bonus_request MUST be MEDIUM or LOW — NEVER HIGH for this intent alone.
+                   This reply is SAFE for auto-insert.
   → game_loss: NEVER pick a reply that promises winning
 
 REWARD PROMISE FILTER (applies to ALL intents):
@@ -511,8 +571,21 @@ intent: withdraw_issue
 best reply: "Boss bagi amount withdraw, bank dan masa submit ya. Saya check status withdrawal sekarang, tunggu sekejap."
 
 Customer: "ada bonus?"
-intent: bonus_request
+intent: bonus_request, riskLevel: LOW
 best reply: "Saya check dulu account boss ada bonus available atau tidak ya. Kalau ada, saya terus guide cara claim."
+
+Customer: "kalau kau tak bagi angpau 100 saya tak deposit lagi kat sini"
+intent: bonus_request, riskLevel: MEDIUM (NOT HIGH — threatening to not deposit is not a severe threat)
+❌ WRONG: riskLevel=HIGH or "Amoi bagi hadiah boss"
+✅ CORRECT: "Bossku faham boss nak angpao tu 🙏 tapi angpao memang kena ikut syarat promo/account ya, amoi tak boleh direct bagi kosong. Kalau boss cukup syarat nanti boleh claim dekat promotion page ya ❤️"
+
+Customer: "saya deposit banyak2 soal nya you tak berani bagi"
+intent: bonus_request, riskLevel: MEDIUM
+✅ CORRECT: "Faham boss, tapi bonus memang ikut syarat account dan promo yang active ya. Kalau boss nak, boleh check promotion page dulu — mana yang layak boleh terus claim ya 🙏"
+
+Customer: "you tak bagi apa"
+intent: bonus_request, riskLevel: LOW
+✅ CORRECT: "Boss jangan kecil hati ya 🙏 bonus bukan tak nak bagi, cuma kena ikut syarat promo/account. Bila cukup syarat, boss boleh claim yang available terus."
 
 Customer: "kenapa lama sangat tak balas"
 intent: angry_complaint
@@ -576,6 +649,11 @@ Before finalizing your JSON output, mentally check ALL of the following:
 
 [ ] LANGUAGE CHECK: Are all 3 replies in the same language track as the customer?
     → If NO: fix before returning.
+
+[ ] BONUS RISK CHECK: Is intent = bonus_request?
+    → If YES AND no severe threat (serious profanity, self-harm, legal, fraud): riskLevel MUST be MEDIUM or LOW.
+    → Do NOT mark HIGH for bonus requests alone. This intent is safe for auto-insert.
+    → If any reply promises reward: rewrite to comfort + explain eligibility + guide to promo page.
 
 Only return JSON after ALL checks pass.
 `.trim()
@@ -734,7 +812,7 @@ const RESPONSE_SCHEMA = {
     },
     caseState: {
       type: 'string',
-      description: 'Current case state based on full conversation history: NEED_CHECK | WAITING_RECEIPT | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED',
+      description: 'Current case state based on full conversation history: NEED_CHECK | WAITING_RECEIPT | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED',
     },
     riskLevel: {
       type: 'string',
@@ -1001,6 +1079,29 @@ All 3 replies must: (1) state the outcome is final, (2) offer new number registr
       const scores = result.replies.map(r => r.score)
       const maxScore = Math.max(...scores)
       result.bestReplyIndex = scores.indexOf(maxScore)
+    }
+
+    // ── Bonus request: cap riskLevel + scrub any reward promise replies ─────────
+
+    const SEVERE_THREAT_RE   = /\b(fuck|anjing|babi|celaka|pukimak|bodoh\s*gila|sue|lawyer|polis|report|scam|fraud|tipu|bunuh|mati)\b/i
+    const REWARD_PROMISE_RE  = /\b(amoi|saya|i)\s+(bagi|arrange|kasi)\b|confirm\s+dapat|boleh\s+dapat\s+(angpao|bonus|hadiah|free\s*credit)|nanti\s+(amoi|saya)\s+bagi/i
+    const BONUS_SAFE_REPLY   = 'Boss, angpao/bonus memang kena ikut syarat promo dan eligibility account ya 🙏 Amoi tak boleh janji direct bagi — kalau account layak, boleh claim dekat promotion page ya.'
+
+    const isBonusIntent = /bonus_request/.test(result.intent || '')
+
+    if (isBonusIntent && !SEVERE_THREAT_RE.test(rawMsg) && result.riskLevel === 'HIGH') {
+      result.riskLevel = 'MEDIUM'
+      console.log('[livechat-ai] bonus_request: capped riskLevel HIGH → MEDIUM')
+    }
+
+    if (isBonusIntent) {
+      result.replies = result.replies.map(r => {
+        if (REWARD_PROMISE_RE.test(r.text)) {
+          console.log('[livechat-ai] bonus_request: scrubbed reward promise:', r.text.slice(0, 80))
+          return { type: r.type, text: BONUS_SAFE_REPLY, score: r.score }
+        }
+        return r
+      })
     }
 
     // Clamp bestReplyIndex to valid range
