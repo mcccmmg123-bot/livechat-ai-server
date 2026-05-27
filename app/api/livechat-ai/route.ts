@@ -219,9 +219,11 @@ riskLevel = HIGH ONLY when customer message contains a REAL severe trigger:
 
 riskLevel = MEDIUM for:
   → Ordinary profanity / cursing without any of the above triggers:
-    "babi", "anjing", "pukimak", "celaka", "bodoh", "wtf", "fuck", "lancau", "kepala bapak"
+    "babi", "anjing", "pukimak", "celaka", "bodoh", "wtf", "fuck", "lancau", "kepala bapak", "cibai"
   → Angry tone, venting, game loss frustration, cursing at the game/slot/platform
+  → intent = profanity_game_anger — pure curse messages, MEDIUM always
   → intent = game_loss_anger — always MEDIUM even with heavy profanity about losing
+  → caseState = EMOTIONAL_COOLDOWN — always MEDIUM, never HIGH
   → Threatening to stop depositing ("kalau tak bagi saya tak deposit lagi")
   → Bonus requests with any level of frustration or threats to leave
   → Unresolved payment/withdraw issues (standard follow-up)
@@ -344,16 +346,35 @@ PROMO_PAGE_ALREADY_EXPLAINED
   → Do NOT re-explain eligibility at length. Do NOT offer to personally check promo.
   → SHORT warm redirect to Promotion Page / latest promo only.
 
+EMOTIONAL_COOLDOWN
+  → Customer is sending pure emotional frustration — profanity, rage, or emotional explosion
+    WITHOUT any specific transaction issue (no deposit, withdrawal, login, claim, or blacklist context).
+  → Signals: message is mostly curse words, insults, or raw venting with no actionable request.
+  → Examples: "anjing", "babi", "pukimak", "kepala bapak kau cibai",
+    "da nk mampus pon jd bodo lg", single profanity messages
+  → There is NOTHING to check. Do NOT offer help, investigation, or service.
+  → COMFORT ONLY: brief apology + acknowledge anger + suggest rest. NOTHING ELSE.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 2 — CLASSIFY INTENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Read latestCustomerMessage carefully. Pick ONE primary intent:
 
+profanity_game_anger
+  → Customer sends pure profanity, rage, or emotional explosion with NO specific transaction issue.
+  → Message is mostly curse words, insults, or raw venting — no deposit/withdrawal/claim/login context.
+  → Examples: "anjing", "babi", "pukimak", "kepala bapak kau cibai", "da nk mampus pon jd bodo lg"
+  → caseState MUST = EMOTIONAL_COOLDOWN
+  → riskLevel = MEDIUM — NEVER HIGH for ordinary profanity alone
+  → DO NOT offer help, ask what happened, check account, or push promo.
+  → COMFORT ONLY: brief apology + acknowledge anger + suggest rest.
+
 angry_complaint
-  → Customer is angry, cursing, venting, complaining. No specific transaction issue.
-  → Keywords: "bodoh", "wtf", "mana boleh", "tidak puas", "teruk", "complaint", "babi", "anjing",
-              "pukimak", "celaka", "fuck", angry or vulgar tone without specific transaction.
+  → Customer is angry or frustrated about the service/platform, but has an implied or stated issue.
+  → Different from profanity_game_anger: customer is complaining ABOUT something (response time, fairness, service).
+  → Keywords: "bodoh", "wtf", "mana boleh", "tidak puas", "teruk", "complaint", "kenapa lambat",
+    "tak adil", "teruk sangat", frustrated tone WITH a complaint about service, not just raw curses.
   → riskLevel = MEDIUM (never HIGH for ordinary profanity — see RISK LEVEL RULES above)
 
 deposit_not_arrived
@@ -528,6 +549,28 @@ IF caseState is PROMO_PAGE_ALREADY_EXPLAINED:
     "Boss, faham boss nak angpao tu 🙏 Tapi bonus semua ikut promo page ya. Boss boleh pilih latest promo yang sesuai, deposit ikut syarat terus boleh claim."
     "Sayang, untuk angpao memang kena ikut promo ya 😅 Cuba tengok Promotion Page dulu, kalau ada promo terbaru yang ngam, boleh join dan claim ikut syarat ❤️"
 
+IF caseState is EMOTIONAL_COOLDOWN:
+  ❌ ABSOLUTELY BANNED (NEVER say any of these):
+    "saya bantu", "amoi bantu", "cuba bantu", "I can help", "let me help",
+    "boleh kongsi masalah", "cerita la sikit", "boleh cerita apa jadi",
+    "saya check", "amoi check", "semak", "tengok account", "check account",
+    "selesaikan masalah", "follow up", "saya tengok", "saya akan selesaikan",
+    "let me assist", any question, any service offer, any promo/bonus mention
+  ✅ MUST DO:
+    1. ONE brief apology line.
+    2. Acknowledge customer is angry / upset.
+    3. Gently suggest rest / cooling down.
+    4. STOP. No questions. No offers. No promises.
+  ✅ REPLIES must be MAX 1–2 lines. Warm, human, no action offer.
+  ✅ MALAY EXAMPLES:
+    "Maaf ya boss 🙏 Faham boss tengah panas sekarang. Rehat dulu sekejap, jangan paksa diri bila mood tengah tak okay."
+    "Sorry bossku 🙏 Hari ni memang tak kena mood. Cool dulu ya, nanti bila kepala tenang baru sambung slow-slow."
+    "Faham boss tengah marah 😔 Kadang game memang tak ikut apa kita harap. Rehat jap dulu ya, jangan terus kejar masa tengah panas."
+  ✅ CHINESE EXAMPLE:
+    "老板，不好意思，知道你现在很生气。先冷静一下，不要在情绪上来的时候硬追，休息一下再决定。"
+  ✅ ENGLISH EXAMPLE:
+    "Sorry boss, I understand you're really upset right now. Take a short break first and don't force it while your mood is hot."
+
 IF caseState is PAYMENT_PENDING or WITHDRAW_PROCESSING:
   → DO NOT say "let me check from scratch" — the status is known.
   → Give a status update: processing, in queue, team is handling.
@@ -608,6 +651,20 @@ game_loss:
   → DO NOT promise they will win. DO NOT say "confirm menang" or "fight lagi".
   → Can ask which game. Can suggest rest or slow mode.
   → Example: "Boss, faham memang geram bila game makan macam tu. Rehat sekejap dulu ya, nanti mood ok boleh sambung balik."
+
+profanity_game_anger:
+  → ⚠️ COMFORT ONLY. Customer is venting pure emotion — no actionable request exists.
+  → ❌ ABSOLUTELY BANNED in ALL replies:
+    "saya bantu", "amoi bantu", "cuba bantu", "boleh kongsi masalah", "cerita la sikit",
+    "saya check", "amoi check", "semak", "tengok account", "selesaikan masalah",
+    "follow up", "account", "let me help", any question, any service offer
+  → FORMULA: (1) brief apology → (2) acknowledge anger → (3) suggest rest → STOP
+  → Max 2 lines per reply. No questions. No action offers. No promo.
+  ✅ Malay:
+    "Maaf ya boss 🙏 Faham boss tengah panas sekarang. Rehat dulu sekejap, jangan paksa diri bila mood tengah tak okay."
+    "Sorry bossku 🙏 Hari ni memang tak kena mood. Cool dulu ya, nanti bila kepala tenang baru sambung slow-slow."
+  ✅ Chinese: "老板，不好意思，知道你现在很生气。先冷静一下，休息一下再决定。"
+  ✅ English: "Sorry boss, I understand you're really upset right now. Take a short break and don't force it."
 
 game_loss_anger:
   → ⚠️ COMFORT ONLY. This customer is emotionally venting — they do NOT need account checks.
@@ -704,6 +761,10 @@ ABSOLUTE PROHIBITIONS
 ❌ NEVER sound like a template bot
 ❌ NEVER mark riskLevel HIGH for ordinary profanity / cursing / anger alone
 ❌ NEVER tell customer their case needs "manual review" for ordinary anger or profanity
+❌ When intent = profanity_game_anger / game_loss_anger OR caseState = EMOTIONAL_COOLDOWN:
+   NEVER say: "saya bantu" / "amoi bantu" / "cuba bantu" / "boleh kongsi masalah" /
+   "cerita la sikit" / "saya check" / "amoi check" / "semak" / "tengok account" /
+   "selesaikan masalah" / "follow up" / "saya tengok" / "let me assist"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 6 — SCORE & SELECT BEST
@@ -720,6 +781,7 @@ MANDATORY based on caseState:
   → INVALID_ACCOUNT_DETAILS: best reply MUST clarify the SPECIFIC DETAIL (number/IC) is wrong — NOT that the bank/wallet type is unsupported. Ask customer to re-confirm correct detail.
   → BONUS_ELIGIBILITY_REQUIRED: best reply MUST direct customer to Promotion Page. MUST NOT say "amoi check promo" or offer to personally check promo.
   → PROMO_PAGE_ALREADY_EXPLAINED: best reply MUST be SHORT (max 2 lines) direct promo page redirect. MUST NOT say "check", must NOT promise reward, must NOT re-explain eligibility at length.
+  → EMOTIONAL_COOLDOWN: best reply MUST be comfort-only (max 2 lines). MUST NOT contain any help/check/service offer phrase. No questions. No promo. riskLevel MUST be MEDIUM or LOW.
 
 MANDATORY risk level:
   → riskLevel HIGH ONLY for: legal threat / self-harm / fraud accusation / physical threat / CONFIRMED_BLACKLIST
@@ -747,6 +809,10 @@ MANDATORY based on intent (when caseState = NEED_CHECK):
                      Best reply MUST be COMFORT ONLY — acknowledge anger + suggest rest + slow play.
                      riskLevel MUST be MEDIUM or LOW. NEVER HIGH for game loss anger alone.
                      This reply is SAFE for auto-insert.
+  → profanity_game_anger: NEVER pick a reply that contains "saya bantu" / "amoi bantu" / "cuba bantu" / "boleh kongsi" /
+                           "saya check" / "amoi check" / "semak" / "tengok account" / "follow up" / "selesaikan".
+                           Best reply MUST be 1–2 lines of comfort only. No questions. No service offer.
+                           riskLevel MUST be MEDIUM or LOW. SAFE for auto-insert.
 
 REWARD PROMISE FILTER (applies to ALL intents):
   → If any reply contains banned reward phrases ("saya bagi hadiah", "amoi bagi angpao", "ada gift", "boleh dapat bonus", etc.) — that reply gets score 0 and must NOT be selected as bestReplyIndex
@@ -811,9 +877,20 @@ intent: game_loss_anger, riskLevel: MEDIUM, replyLanguage: zh
 ✅ CORRECT: "老板，知道你现在很不爽，今天游戏不顺真的会很影响心情。先休息一下，不要硬追，等心态稳了再慢慢玩。"
 
 Customer: "Pukimak"
-intent: angry_complaint, riskLevel: MEDIUM (NOT HIGH — ordinary profanity only, no game context)
-❌ WRONG: riskLevel=HIGH
-✅ CORRECT: "Boss, maaf kalau ada yang buat boss tak puas hati. Boleh cerita apa yang jadi? Amoi sini untuk bantu."
+intent: profanity_game_anger, caseState: EMOTIONAL_COOLDOWN, riskLevel: MEDIUM
+❌ WRONG: riskLevel=HIGH, "Boleh cerita apa yang jadi?" (asking question — banned), "Amoi sini untuk bantu" (help offer — banned)
+✅ CORRECT: "Maaf ya boss 🙏 Faham boss tengah panas sekarang. Rehat dulu sekejap, jangan paksa diri bila mood tengah tak okay."
+
+Customer: "kepala bapak kau laa cibai"
+intent: profanity_game_anger, caseState: EMOTIONAL_COOLDOWN, riskLevel: MEDIUM
+❌ WRONG: "Boss, saya bantu ya. Boleh kongsi masalah boss?" (help offer + question — both banned)
+❌ WRONG: "Amoi check account boss sekejap" (check banned)
+✅ CORRECT: "Sorry bossku 🙏 Hari ni memang tak kena mood. Cool dulu ya, nanti bila kepala tenang baru sambung slow-slow."
+
+Customer: "da nk mampus pon jd bodo lg"
+intent: profanity_game_anger, caseState: EMOTIONAL_COOLDOWN, riskLevel: MEDIUM
+❌ WRONG: riskLevel=HIGH (no legal/self-harm/fraud trigger — "mampus" here is casual venting, not self-harm threat)
+✅ CORRECT: "Faham boss tengah marah 😔 Kadang game memang tak ikut apa kita harap. Rehat jap dulu ya, jangan terus kejar masa tengah panas."
 
 Customer: "你是不是骗人的"  (Chinese — zh track)
 intent: angry_complaint, replyLanguage: zh
@@ -957,6 +1034,14 @@ Before finalizing your JSON output, mentally check ALL of the following:
       en: "Boss, I understand you're upset because the game didn't go your way. Take a short break first and don't force it. If you continue later, play slowly within your budget."
     → riskLevel MUST be MEDIUM or LOW — safe for auto-insert.
 
+[ ] PROFANITY_GAME_ANGER / EMOTIONAL_COOLDOWN CHECK: Is intent = profanity_game_anger OR caseState = EMOTIONAL_COOLDOWN?
+    → If YES: ALL 3 replies MUST be comfort-only (max 2 lines). ZERO help / check / service phrases.
+    → If ANY reply contains: "saya bantu" / "amoi bantu" / "cuba bantu" / "boleh kongsi" / "saya check" / "amoi check" / "semak" / "tengok account" / "selesaikan" / "follow up" / "let me assist" / any question → replace with language-matched fallback:
+      ms: "Maaf ya boss 🙏 Faham boss tengah panas sekarang. Rehat dulu sekejap, jangan paksa diri bila mood tengah tak okay."
+      zh: "老板，不好意思，知道你现在很生气。先冷静一下，不要在情绪上来的时候硬追，休息一下再决定。"
+      en: "Sorry boss, I understand you're really upset right now. Take a short break first and don't force it while your mood is hot."
+    → riskLevel MUST be MEDIUM or LOW. NEVER HIGH for pure profanity/venting.
+
 Only return JSON after ALL checks pass.
 `.trim()
 
@@ -1039,9 +1124,9 @@ OUTPUT FIELDS:
 
 emotion — ONE of: angry | frustrated | sad | neutral | happy | confused | suspicious
 
-intent — ONE of: angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | game_loss_anger | payment_receipt_request | general_question
+intent — ONE of: profanity_game_anger | angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | game_loss_anger | payment_receipt_request | general_question
 
-caseState — ONE of: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS | PROMO_PAGE_ALREADY_EXPLAINED
+caseState — ONE of: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS | PROMO_PAGE_ALREADY_EXPLAINED | EMOTIONAL_COOLDOWN
 
 riskLevel — ONE of: HIGH | MEDIUM | LOW
 
@@ -1112,11 +1197,11 @@ const RESPONSE_SCHEMA = {
     },
     intent: {
       type: 'string',
-      description: 'Customer intent: angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | game_loss_anger | payment_receipt_request | general_question',
+      description: 'Customer intent: profanity_game_anger | angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | game_loss_anger | payment_receipt_request | general_question',
     },
     caseState: {
       type: 'string',
-      description: 'Current case state: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS | PROMO_PAGE_ALREADY_EXPLAINED',
+      description: 'Current case state: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS | PROMO_PAGE_ALREADY_EXPLAINED | EMOTIONAL_COOLDOWN',
     },
     riskLevel: {
       type: 'string',
@@ -1565,6 +1650,35 @@ Each reply must: (1) one short warm line, (2) direct to Promotion Page / latest 
         if (GAME_LOSS_CHECK_RE.test(r.text)) {
           console.log('[livechat-ai] game_loss_anger scrub — replaced check/promo reply:', r.text.slice(0, 80))
           return { type: r.type, text: GAME_LOSS_FALLBACK, score: 0 }
+        }
+        return r
+      })
+      const scores = result.replies.map(r => r.score)
+      result.bestReplyIndex = scores.indexOf(Math.max(...scores))
+    }
+
+    // ── PROFANITY_GAME_ANGER / EMOTIONAL_COOLDOWN: comfort-only scrubber ────────
+    const isProfanityGameAnger = /profanity_game_anger/.test(result.intent || '')
+    const isEmotionalCooldown  = result.caseState === 'EMOTIONAL_COOLDOWN'
+
+    if (isProfanityGameAnger || isEmotionalCooldown) {
+      if (isProfanityGameAnger) result.caseState = 'EMOTIONAL_COOLDOWN'
+      if (result.riskLevel === 'HIGH') {
+        result.riskLevel = 'MEDIUM'
+        console.log('[livechat-ai] profanity_game_anger: capped riskLevel HIGH → MEDIUM')
+      }
+      const COMFORT_BANNED_RE = /\b(saya|amoi)\s+(bantu|cuba\s+bantu)\b|cuba\s+bantu|boleh\s+kongsi\s+masalah|cerita\s+la\s+sikit|saya\s+check|amoi\s+check|\bsemak\b|tengok\s+account|selesaikan\s+masalah|follow\s+up|saya\s+tengok|saya\s+akan\s+selesai|let\s+me\s+(assist|help)\b/i
+      const lang = (result.replyLanguage || 'ms').toLowerCase()
+      const COMFORT_FALLBACK =
+        lang === 'zh'
+          ? '老板，不好意思，知道你现在很生气。先冷静一下，不要在情绪上来的时候硬追，休息一下再决定。'
+          : lang === 'en'
+          ? "Sorry boss, I understand you're really upset right now. Take a short break first and don't force it while your mood is hot."
+          : 'Maaf ya boss 🙏 Faham boss tengah panas sekarang. Rehat dulu sekejap, jangan paksa diri bila mood tengah tak okay.'
+      result.replies = result.replies.map(r => {
+        if (COMFORT_BANNED_RE.test(r.text)) {
+          console.log('[livechat-ai] profanity_game_anger scrub:', r.text.slice(0, 80))
+          return { type: r.type, text: COMFORT_FALLBACK, score: 0 }
         }
         return r
       })
