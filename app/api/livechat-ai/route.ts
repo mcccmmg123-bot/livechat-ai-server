@@ -220,7 +220,8 @@ riskLevel = HIGH ONLY when customer message contains a REAL severe trigger:
 riskLevel = MEDIUM for:
   → Ordinary profanity / cursing without any of the above triggers:
     "babi", "anjing", "pukimak", "celaka", "bodoh", "wtf", "fuck", "lancau", "kepala bapak"
-  → Angry tone, venting, game loss frustration
+  → Angry tone, venting, game loss frustration, cursing at the game/slot/platform
+  → intent = game_loss_anger — always MEDIUM even with heavy profanity about losing
   → Threatening to stop depositing ("kalau tak bagi saya tak deposit lagi")
   → Bonus requests with any level of frustration or threats to leave
   → Unresolved payment/withdraw issues (standard follow-up)
@@ -379,9 +380,22 @@ bonus_request
     this is STILL bonus_request. riskLevel = MEDIUM at most. NEVER HIGH for this intent alone.
 
 game_loss
-  → Customer complains about losing, game taking money, no wins.
-  → Keywords: "asik kalah", "game makan", "tak bagi win", "rugi", "tak dapat bonus", "kalah",
-               "dah berapa kali kalah"
+  → Customer expresses calm / mild frustration about losing, game taking money, or no wins.
+  → No excessive anger, profanity, or blaming the platform.
+  → Keywords: "asik kalah", "game makan", "tak bagi win", "rugi", "kalah", "dah berapa kali kalah"
+
+game_loss_anger
+  → Customer is ANGRY, cursing, or venting SPECIFICALLY because of losing money or game not giving wins.
+  → They blame the game / platform, use profanity, or express strong emotional frustration about results.
+  → Keywords (anger + game loss combined):
+    "game babi", "game bodoh", "game sial", "anjing game", "pukimak game",
+    "ko kasih win ke aku", "takkan tak bagi win langsung", "game makan duit babi",
+    "game tipu", "slot tipu", "rugi banyak", "kalah terus", "asik kalah bodoh",
+    "tak pernah menang", "game tak betul", "babi slot", "celaka game",
+    "game macam haram", "angkat duit tak bagi win"
+  → riskLevel = MEDIUM at most — ordinary profanity in this context is NOT HIGH risk.
+  → DO NOT: check account, check payment, ask for receipt, offer promo check.
+  → DO: comfort ONLY — acknowledge anger, suggest rest, encourage slow play.
 
 payment_receipt_request
   → Customer sends a receipt, bank slip, or asks to verify a payment transfer.
@@ -593,9 +607,23 @@ game_loss:
   → Acknowledge the loss — use customer's exact words.
   → DO NOT promise they will win. DO NOT say "confirm menang" or "fight lagi".
   → Can ask which game. Can suggest rest or slow mode.
-  → Can offer to check relevant promo.
-  → Example: "Boss, faham memang geram bila game makan macam tu.
-               Rest kejap dulu ya — amoi check kalau ada promo untuk account boss."
+  → Example: "Boss, faham memang geram bila game makan macam tu. Rehat sekejap dulu ya, nanti mood ok boleh sambung balik."
+
+game_loss_anger:
+  → ⚠️ COMFORT ONLY. This customer is emotionally venting — they do NOT need account checks.
+  → BANNED in ALL replies:
+    "check", "semak", "tengok account", "keadaan account", "saya bantu check",
+    "amoi check", "payment side", "promo check", "check keadaan", "check payment",
+    any promo offer, any angpao/bonus suggestion
+  → FORMULA: (1) acknowledge anger warmly → (2) validate feeling → (3) suggest rest / slow play → (4) STOP.
+  → DO NOT push promo. DO NOT offer to check anything. DO NOT promise wins.
+  → Keep it 1–3 lines. Warm, human, no script.
+  ✅ MALAY example:
+    "Boss, faham boss tengah panas sebab game tak jalan macam boss harap 🙏 Rehat kejap dulu ya, jangan paksa diri. Kalau nak sambung nanti, main slow-slow ikut modal boss."
+  ✅ CHINESE example:
+    "老板，知道你现在很不爽，今天游戏不顺真的会很影响心情。先休息一下，不要硬追，等心态稳了再慢慢玩。"
+  ✅ ENGLISH example:
+    "Boss, I understand you're upset because the game didn't go your way. Take a short break first and don't force it. If you continue later, play slowly within your budget."
 
 payment_receipt_request:
   → Acknowledge the receipt was received.
@@ -715,6 +743,10 @@ MANDATORY based on intent (when caseState = NEED_CHECK):
                    riskLevel MUST be MEDIUM or LOW — NEVER HIGH for this intent alone.
                    This reply is SAFE for auto-insert.
   → game_loss: NEVER pick a reply that promises winning
+  → game_loss_anger: NEVER pick a reply that contains "check" / "semak" / "tengok account" / "promo check" / "payment side".
+                     Best reply MUST be COMFORT ONLY — acknowledge anger + suggest rest + slow play.
+                     riskLevel MUST be MEDIUM or LOW. NEVER HIGH for game loss anger alone.
+                     This reply is SAFE for auto-insert.
 
 REWARD PROMISE FILTER (applies to ALL intents):
   → If any reply contains banned reward phrases ("saya bagi hadiah", "amoi bagi angpao", "ada gift", "boleh dapat bonus", etc.) — that reply gets score 0 and must NOT be selected as bestReplyIndex
@@ -733,8 +765,9 @@ intent: claim_issue
 best reply: "Boss send screenshot error dan promo mana yang nak claim ya. Amoi check eligibility account dulu, kalau layak saya guide boss terus."
 
 Customer: "anjing la game makan"
-intent: game_loss (+ angry_complaint tone)
-best reply: "Boss, faham memang geram bila game makan macam tu. Rehat kejap dulu ya, saya check kalau ada promo yang sesuai untuk account boss."
+intent: game_loss_anger, riskLevel: MEDIUM (NOT HIGH — ordinary profanity + game loss anger)
+❌ WRONG: "Saya check kalau ada promo untuk account boss" (check + promo offer banned for this intent)
+✅ CORRECT: "Boss, faham memang geram bila game makan macam tu 🙏 Rehat dulu kejap ya, jangan paksa diri. Kalau nak sambung nanti, main slow-slow je."
 
 Customer: "withdraw belum masuk"
 intent: withdraw_issue
@@ -762,12 +795,23 @@ intent: angry_complaint
 best reply: "Boss, maaf sangat buat boss tunggu lama. Amoi ada sekarang, nak tanya pasal apa ya?"
 
 Customer: "Ko berapa kali ada ko kasih win ke aku babi"
-intent: angry_complaint, riskLevel: MEDIUM (NOT HIGH — "babi" is ordinary profanity, not a legal/physical threat)
-❌ WRONG: riskLevel=HIGH, "manual review needed"
-✅ CORRECT: "Boss, saya faham boss tengah panas sebab game tak jalan macam boss harap 🙏 Rehat kejap dulu ya, kalau nak sambung nanti boleh cuba game lain ikut modal boss."
+intent: game_loss_anger, riskLevel: MEDIUM (NOT HIGH — anger about losing + ordinary profanity)
+❌ WRONG: riskLevel=HIGH, "manual review", or any check/promo reply
+✅ CORRECT: "Boss, faham boss tengah panas sebab game tak jalan macam boss harap 🙏 Rehat kejap dulu ya, jangan paksa diri. Kalau nak sambung nanti, main slow-slow ikut modal boss."
+
+Customer: "game bodoh tak bagi win langsung pukimak"
+intent: game_loss_anger, riskLevel: MEDIUM
+❌ WRONG: "Amoi check account boss sekejap ya" (check banned for this intent)
+❌ WRONG: "Boss boleh check promo untuk sambung main" (promo offer banned)
+✅ CORRECT: "Boss, memang geram bila game tak kasi peluang harini 🙏 Rehat dulu ya, jangan lawan game dalam keadaan panas — nanti main slow-slow balik."
+
+Customer: "今天赢不了，输了很多，这个游戏是假的吗" (Chinese game_loss_anger)
+intent: game_loss_anger, riskLevel: MEDIUM, replyLanguage: zh
+❌ WRONG: "老板，我帮你 check 账号情况 ya" (check banned + language mixed)
+✅ CORRECT: "老板，知道你现在很不爽，今天游戏不顺真的会很影响心情。先休息一下，不要硬追，等心态稳了再慢慢玩。"
 
 Customer: "Pukimak"
-intent: angry_complaint, riskLevel: MEDIUM (NOT HIGH — ordinary profanity only)
+intent: angry_complaint, riskLevel: MEDIUM (NOT HIGH — ordinary profanity only, no game context)
 ❌ WRONG: riskLevel=HIGH
 ✅ CORRECT: "Boss, maaf kalau ada yang buat boss tak puas hati. Boleh cerita apa yang jadi? Amoi sini untuk bantu."
 
@@ -904,6 +948,15 @@ Before finalizing your JSON output, mentally check ALL of the following:
     → If any reply contains: "check" / "semak" / "account eligibility" / "hidden" / "special" / "arrange" / "boleh bagi" → replace with:
       "Bossku, angpao memang tak boleh direct bagi ya 🙏 Kalau boss nak bonus, boleh tengok Promotion Page — latest promo semua ada dekat sana, ikut syarat boleh terus claim ❤️"
 
+[ ] GAME_LOSS_ANGER CHECK: Is intent = game_loss_anger?
+    → If YES: ensure NONE of the 3 replies contain: "check" / "semak" / "tengok account" / "keadaan account" / "saya bantu check" / "amoi check" / "payment side" / "promo check" / any bonus/angpao offer.
+    → Best reply MUST be comfort-only: acknowledge anger + suggest rest + encourage slow play.
+    → If any reply contains banned check/promo phrases → replace with the appropriate comfort reply:
+      ms: "Boss, faham boss tengah panas sebab game tak jalan macam boss harap 🙏 Rehat kejap dulu ya, jangan paksa diri. Kalau nak sambung nanti, main slow-slow ikut modal boss."
+      zh: "老板，知道你现在很不爽，今天游戏不顺真的会很影响心情。先休息一下，不要硬追，等心态稳了再慢慢玩。"
+      en: "Boss, I understand you're upset because the game didn't go your way. Take a short break first and don't force it. If you continue later, play slowly within your budget."
+    → riskLevel MUST be MEDIUM or LOW — safe for auto-insert.
+
 Only return JSON after ALL checks pass.
 `.trim()
 
@@ -986,7 +1039,7 @@ OUTPUT FIELDS:
 
 emotion — ONE of: angry | frustrated | sad | neutral | happy | confused | suspicious
 
-intent — ONE of: angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | payment_receipt_request | general_question
+intent — ONE of: angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | game_loss_anger | payment_receipt_request | general_question
 
 caseState — ONE of: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS | PROMO_PAGE_ALREADY_EXPLAINED
 
@@ -1059,7 +1112,7 @@ const RESPONSE_SCHEMA = {
     },
     intent: {
       type: 'string',
-      description: 'Customer intent: angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | payment_receipt_request | general_question',
+      description: 'Customer intent: angry_complaint | deposit_not_arrived | claim_issue | withdraw_issue | bonus_request | game_loss | game_loss_anger | payment_receipt_request | general_question',
     },
     caseState: {
       type: 'string',
@@ -1488,6 +1541,35 @@ Each reply must: (1) one short warm line, (2) direct to Promotion Page / latest 
         }
         return r
       })
+    }
+
+    // ── GAME_LOSS_ANGER: scrub any check/promo replies; ensure comfort-only ─────
+    const isGameLossAnger = /game_loss_anger/.test(result.intent || '')
+
+    if (isGameLossAnger) {
+      // Cap risk
+      if (result.riskLevel === 'HIGH') {
+        result.riskLevel = 'MEDIUM'
+        console.log('[livechat-ai] game_loss_anger: capped riskLevel HIGH → MEDIUM')
+      }
+      // Scrub check/promo/account references
+      const GAME_LOSS_CHECK_RE = /\b(amoi|saya|i|biar\s+amoi)\s+(check|semak|tengok|cek)\b|check\s+(account|keadaan|payment|promo|status)|semak\s+account|tengok\s+account|payment\s+side|promo\s+check|saya\s+bantu\s+check|amoi\s+check/i
+      const lang = (result.replyLanguage || 'ms').toLowerCase()
+      const GAME_LOSS_FALLBACK =
+        lang === 'zh'
+          ? '老板，知道你现在很不爽，今天游戏不顺真的会很影响心情。先休息一下，不要硬追，等心态稳了再慢慢玩。'
+          : lang === 'en'
+          ? "Boss, I understand you're upset because the game didn't go your way. Take a short break first and don't force it. If you continue later, play slowly within your budget."
+          : 'Boss, faham boss tengah panas sebab game tak jalan macam boss harap 🙏 Rehat kejap dulu ya, jangan paksa diri. Kalau nak sambung nanti, main slow-slow ikut modal boss.'
+      result.replies = result.replies.map(r => {
+        if (GAME_LOSS_CHECK_RE.test(r.text)) {
+          console.log('[livechat-ai] game_loss_anger scrub — replaced check/promo reply:', r.text.slice(0, 80))
+          return { type: r.type, text: GAME_LOSS_FALLBACK, score: 0 }
+        }
+        return r
+      })
+      const scores = result.replies.map(r => r.score)
+      result.bestReplyIndex = scores.indexOf(Math.max(...scores))
     }
 
     // ── PROMO_PAGE_ALREADY_EXPLAINED enforcement ──────────────────────────────
