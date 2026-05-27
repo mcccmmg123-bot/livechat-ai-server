@@ -3,6 +3,23 @@ import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+// ── Timeout fallback response ─────────────────────────────────────────────────
+
+const TIMEOUT_FALLBACK = {
+  emotion:          'neutral',
+  intent:           'general_question',
+  caseState:        'NEED_CHECK',
+  riskLevel:        'LOW',
+  conversationGoal: 'soft_retain',
+  strategy:         'Timeout — reply manually',
+  bestReplyIndex:   0,
+  replies: [
+    { type: 'best_action',  text: 'Boss, saya bantu tengok sekejap ya 🙏', score: 80 },
+    { type: 'friendly',     text: 'Boss, saya bantu tengok sekejap ya 🙏', score: 80 },
+    { type: 'short_human',  text: 'Boss, sekejap ya 🙏',                   score: 70 },
+  ],
+}
+
 // ── Humanization style system ─────────────────────────────────────────────────
 
 const STYLES = [
@@ -262,6 +279,16 @@ BONUS_NOT_APPROVED
      "tak layak", "kena ikut syarat", "semua bonus dekat promotion page", "tak qualify"
   → Do NOT re-promise. Gently redirect to promotion page or next eligible moment.
 
+PROMO_PAGE_ALREADY_EXPLAINED
+  → Agent has ALREADY told the customer to visit the Promotion Page OR explained bonus syarat
+    in a PREVIOUS message in this conversation.
+  → Signals from prior agent messages: "promotion page", "promo page", "bonus syarat",
+    "boleh claim dekat promo", "ikut syarat promo", "tak boleh bagi angpao", "kena ikut promo",
+    "semua bonus dekat promo", "sila baca bonus syarat", "latest promo"
+  → AND the customer's LATEST message is STILL asking for angpao / bonus / free credit.
+  → Do NOT re-explain eligibility at length. Do NOT offer to personally check promo.
+  → SHORT warm redirect to Promotion Page / latest promo only.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 2 — CLASSIFY INTENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -413,6 +440,23 @@ IF caseState is BONUS_NOT_APPROVED:
   ✅ EXAMPLE REPLY:
     "Boss jangan kecil hati ya 🙏 bonus bukan tak nak bagi, cuma kena ikut syarat promo/account.
      Bila cukup syarat, boss boleh claim yang available dekat promotion page terus."
+
+IF caseState is PROMO_PAGE_ALREADY_EXPLAINED:
+  ❌ BANNED (hard prohibitions):
+    "amoi check", "saya check", "check kalau ada promo", "check account",
+    "hidden bonus", "special gift", "arrange angpao", "boleh bagi",
+    "confirm dapat", long account eligibility explanations (more than 1 short line)
+  ✅ MUST DO:
+    1. ONE short warm line of acknowledgement — do NOT re-explain eligibility rules.
+    2. State clearly: angpao / bonus cannot be given privately / directly.
+    3. Guide directly to Promotion Page / latest promo.
+    4. Optionally encourage: deposit ikut syarat → claim.
+    5. No hidden-bonus expectation. No checking. No promises.
+  ✅ REPLIES must be MAX 2 lines each. Short. Direct. Warm.
+  ✅ EXAMPLE REPLIES:
+    "Bossku, angpao memang tak boleh direct bagi ya 🙏 Kalau boss nak bonus, boleh tengok Promotion Page — latest promo semua ada dekat sana, ikut syarat boleh terus claim ❤️"
+    "Boss, faham boss nak angpao tu 🙏 Tapi bonus semua ikut promo page ya. Boss boleh pilih latest promo yang sesuai, deposit ikut syarat terus boleh claim."
+    "Sayang, untuk angpao memang kena ikut promo ya 😅 Cuba tengok Promotion Page dulu, kalau ada promo terbaru yang ngam, boleh join dan claim ikut syarat ❤️"
 
 IF caseState is PAYMENT_PENDING or WITHDRAW_PROCESSING:
   → DO NOT say "let me check from scratch" — the status is known.
@@ -589,6 +633,7 @@ MANDATORY based on caseState:
   → RECEIPT_PROVIDED: best reply MUST acknowledge receipt received + confirm verifying. MUST NOT re-ask for receipt/proof.
   → INVALID_ACCOUNT_DETAILS: best reply MUST clarify the SPECIFIC DETAIL (number/IC) is wrong — NOT that the bank/wallet type is unsupported. Ask customer to re-confirm correct detail.
   → BONUS_ELIGIBILITY_REQUIRED: best reply MUST direct customer to Promotion Page. MUST NOT say "amoi check promo" or offer to personally check promo.
+  → PROMO_PAGE_ALREADY_EXPLAINED: best reply MUST be SHORT (max 2 lines) direct promo page redirect. MUST NOT say "check", must NOT promise reward, must NOT re-explain eligibility at length.
 
 MANDATORY based on intent (when caseState = NEED_CHECK):
   → deposit_not_arrived: best reply MUST ask for full receipt details
@@ -714,6 +759,17 @@ caseState: BONUS_ELIGIBILITY_REQUIRED, intent: bonus_request
 ✅ CORRECT: "Bossku, angpao memang kena ikut syarat promo/account ya 🙏 Boss boleh tengok promotion page — mana yang account layak boleh terus claim ya ❤️"
 ✅ CORRECT: "Boss, bonus kena ikut eligibility ya 🙏 Amoi tak boleh direct bagi — boss check promotion page dulu, ada banyak promo yang boss boleh claim sendiri."
 
+--- PROMO PAGE ALREADY EXPLAINED EXAMPLE ---
+
+Scenario: Agent already said "semua bonus dekat promotion page ya" / "kena ikut promo syarat" in a previous message.
+Customer STILL says: "kasi angpao la" / "bagi 100" / "you tak berani bagi".
+caseState: PROMO_PAGE_ALREADY_EXPLAINED, intent: bonus_request
+❌ WRONG: "Amoi check dulu account boss ada promo layak tak?"  (offering to check — forbidden)
+❌ WRONG: Long re-explanation of eligibility rules  (already explained — don't repeat)
+❌ WRONG: riskLevel=HIGH  (bonus_request is MEDIUM or LOW even with threats)
+✅ CORRECT: "Bossku, angpao memang tak boleh direct bagi ya 🙏 Kalau boss nak bonus, boleh tengok Promotion Page — latest promo semua ada dekat sana, ikut syarat boleh terus claim ❤️"
+✅ CORRECT: "Boss, faham boss nak angpao tu 🙏 Tapi bonus semua ikut promo page ya. Boss boleh pilih latest promo yang sesuai, deposit ikut syarat terus boleh claim."
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FINAL VALIDATION BEFORE RETURNING JSON
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -749,6 +805,11 @@ Before finalizing your JSON output, mentally check ALL of the following:
 [ ] BONUS PROMO PAGE CHECK: Is intent = bonus_request OR caseState = BONUS_ELIGIBILITY_REQUIRED?
     → If YES: ensure NONE of the 3 replies say "amoi check promo", "check kalau ada promo", or offer to personally check promo.
     → Best reply MUST direct customer to the Promotion Page to check themselves.
+
+[ ] PROMO EXPLAINED CHECK: Is caseState = PROMO_PAGE_ALREADY_EXPLAINED?
+    → If YES: all 3 replies MUST be short (max 2 lines) promo page redirects.
+    → If any reply contains: "check" / "semak" / "account eligibility" / "hidden" / "special" / "arrange" / "boleh bagi" → replace with:
+      "Bossku, angpao memang tak boleh direct bagi ya 🙏 Kalau boss nak bonus, boleh tengok Promotion Page — latest promo semua ada dekat sana, ikut syarat boleh terus claim ❤️"
 
 Only return JSON after ALL checks pass.
 `.trim()
@@ -907,7 +968,7 @@ const RESPONSE_SCHEMA = {
     },
     caseState: {
       type: 'string',
-      description: 'Current case state based on full conversation history: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS',
+      description: 'Current case state: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS | PROMO_PAGE_ALREADY_EXPLAINED',
     },
     riskLevel: {
       type: 'string',
@@ -1032,6 +1093,7 @@ export async function POST(req: NextRequest) {
 
     if (rawMsg && rawConv.length > 0) {
       // Mode A: message + conversation context (primary)
+      // Slice to last 8 messages for AI input (reduces tokens → faster, less timeout risk)
       const conversation = rawConv
         .filter((m): m is ConvMessage =>
           m !== null && typeof m === 'object' &&
@@ -1040,6 +1102,7 @@ export async function POST(req: NextRequest) {
           (m as ConvMessage).text.trim().length > 0
         )
         .map(m => ({ role: (m as ConvMessage).role, text: (m as ConvMessage).text.trim() }))
+        .slice(-8)
 
       instructions = INSTRUCTIONS_MSG_WITH_CTX
       aiInput      = seedLine + JSON.stringify({ customerMessage: rawMsg, conversationHistory: conversation }, null, 2)
@@ -1054,6 +1117,7 @@ export async function POST(req: NextRequest) {
           (m as ConvMessage).text.trim().length > 0
         )
         .map(m => ({ role: (m as ConvMessage).role, text: (m as ConvMessage).text.trim() }))
+        .slice(-8)
 
       if (!conversation.some(m => m.role === 'customer')) {
         return NextResponse.json(
@@ -1102,24 +1166,76 @@ All 3 replies must: (1) state the outcome is final, (2) offer new number registr
 `
     }
 
-    // ── Call OpenAI ───────────────────────────────────────────────────────────
+    // ── Server-side PROMO_PAGE_ALREADY_EXPLAINED detection ────────────────────
+    // Scans ALL agent messages in rawConv (full history, not just the 8 sent to AI).
 
-    const response = await openai.responses.create({
-      model:             'gpt-4.1-mini',
-      instructions,
-      input:             aiInput,
-      temperature:       1.0,
-      top_p:             0.95,
-      text: {
-        format: {
-          type:   'json_schema',
-          name:   'livechat_response',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          schema: RESPONSE_SCHEMA as any,
-          strict: true,
-        },
-      },
+    const PROMO_AGENT_RE    = /promotion\s+page|promo\s+page|bonus\s+syarat|sila\s+baca\s+bonus|boleh\s+claim\s+dekat\s+promo|ikut\s+syarat\s+promo|tak\s+boleh\s+bagi\s+angpao|kena\s+ikut\s+promo|semua\s+bonus\s+(dekat|kat|ada)\s+promo|latest\s+promo/i
+    const CUSTOMER_BONUS_RE = /angpao|angpau|angpoa|bagi\s+\d+|tak\s+deposit\s+kalau\s+tak\s+bagi|you\s+tak\s+berani\s+bagi|kasi\s+la|free\s+credit|nak\s+bonus|mana\s+bonus|ada\s+bonus/i
+
+    const agentAlreadyExplainedPromo = rawConv.some((m: unknown) => {
+      if (!m || typeof m !== 'object') return false
+      const msg = m as { role?: string; text?: string }
+      return msg.role === 'agent'
+        && typeof msg.text === 'string'
+        && PROMO_AGENT_RE.test(msg.text)
     })
+    const serverDetectedPromoExplained = agentAlreadyExplainedPromo && CUSTOMER_BONUS_RE.test(rawMsg)
+
+    if (serverDetectedPromoExplained) {
+      instructions += `
+
+⚠️ SERVER OVERRIDE — PROMO_PAGE_ALREADY_EXPLAINED:
+Agent has already explained the Promotion Page / bonus syarat in this conversation, but customer is STILL asking for angpao/bonus.
+caseState MUST = "PROMO_PAGE_ALREADY_EXPLAINED".
+riskLevel MUST be MEDIUM or LOW — NEVER HIGH.
+All 3 replies MUST be SHORT (max 2 lines each).
+BANNED in ALL replies: "amoi check", "saya check", "check kalau ada promo", any reward promise, long eligibility explanations.
+Each reply must: (1) one short warm line, (2) direct to Promotion Page / latest promo.
+`
+    }
+
+    // ── Call OpenAI (12 s hard timeout) ──────────────────────────────────────
+
+    const aiController = new AbortController()
+    const aiTimeoutId  = setTimeout(() => aiController.abort(), 12000)
+
+    let response
+    try {
+      response = await openai.responses.create(
+        {
+          model:             'gpt-4.1-mini',
+          instructions,
+          input:             aiInput,
+          temperature:       1.0,
+          top_p:             0.95,
+          max_output_tokens: 800,
+          text: {
+            format: {
+              type:   'json_schema',
+              name:   'livechat_response',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              schema: RESPONSE_SCHEMA as any,
+              strict: true,
+            },
+          },
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { signal: aiController.signal } as any,
+      )
+    } catch (aiErr) {
+      clearTimeout(aiTimeoutId)
+      const isTimeout =
+        (aiErr as { name?: string }).name === 'AbortError' ||
+        (aiErr as { code?: string }).code === 'ERR_CANCELED' ||
+        ((aiErr as { message?: string }).message ?? '').includes('aborted')
+      if (isTimeout) {
+        console.log('[livechat-ai] OpenAI call timed out (12 s) — returning fallback')
+        return NextResponse.json(TIMEOUT_FALLBACK, { headers: CORS })
+      }
+      throw aiErr
+    } finally {
+      clearTimeout(aiTimeoutId)
+    }
 
     const outputText = response.output_text
     if (!outputText) {
@@ -1238,6 +1354,29 @@ All 3 replies must: (1) state the outcome is final, (2) offer new number registr
         }
         return r
       })
+    }
+
+    // ── PROMO_PAGE_ALREADY_EXPLAINED enforcement ──────────────────────────────
+    if (serverDetectedPromoExplained) {
+      result.caseState = 'PROMO_PAGE_ALREADY_EXPLAINED'
+      if (result.riskLevel === 'HIGH') {
+        result.riskLevel = 'MEDIUM'
+        console.log('[livechat-ai] PROMO_EXPLAINED: capped riskLevel HIGH → MEDIUM')
+      }
+    }
+
+    if (result.caseState === 'PROMO_PAGE_ALREADY_EXPLAINED') {
+      const PROMO_FALLBACK = 'Bossku, angpao memang tak boleh direct bagi ya 🙏 Kalau boss nak bonus, boleh tengok Promotion Page — latest promo semua ada dekat sana, ikut syarat boleh terus claim ❤️'
+      const BANNED_IN_PROMO_EXPLAINED = /\b(amoi|saya|i|biar\s+amoi)\s+(check|tengok|semak|cek)\b|account\s+eligib|hidden\s+bonus|special\s+(gift|bonus)|arrange\s+(angpao|bonus)|confirm\s+dapat/i
+      result.replies = result.replies.map(r => {
+        if (BANNED_IN_PROMO_EXPLAINED.test(r.text)) {
+          console.log('[livechat-ai] PROMO_EXPLAINED scrub:', r.text.slice(0, 80))
+          return { type: r.type, text: PROMO_FALLBACK, score: 0 }
+        }
+        return r
+      })
+      const scores = result.replies.map(r => r.score)
+      result.bestReplyIndex = scores.indexOf(Math.max(...scores))
     }
 
     // Clamp bestReplyIndex to valid range
