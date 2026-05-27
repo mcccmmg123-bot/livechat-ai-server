@@ -192,6 +192,14 @@ WAITING_RECEIPT
   → Customer has NOT yet sent it, or just re-sent without new info.
   → Do NOT ask for receipt again — acknowledge and follow up.
 
+RECEIPT_PROVIDED
+  → Customer has ALREADY sent a receipt / screenshot / image / payment proof in this conversation.
+  → Signals: customer message with "[image]", "[photo]", "ni resit", "dah send resit", "ini resit",
+     "resit dah", "gambar dah send", "dah hantar bukti", "screenshot dah send", "payment slip"
+     OR the customer says they have sent it and agent already received/acknowledged it.
+  → Do NOT ask for receipt or proof again — it has already been provided.
+  → Acknowledge receipt received and confirm you are verifying.
+
 PAYMENT_PENDING
   → Agent or system confirmed payment/deposit is being processed.
   → Customer is asking for an update.
@@ -231,6 +239,17 @@ CUSTOMER_DENYING
 ESCALATED
   → Case has been raised to supervisor / higher team in previous messages.
   → Acknowledge escalation; don't make new promises.
+
+INVALID_ACCOUNT_DETAILS
+  → Agent confirmed that the specific account number / bank account / e-wallet number / IC number
+    provided by the customer is INVALID, INCORRECT, or does NOT match system records.
+  → Keywords from agent: "acc invalid", "account invalid", "acc anda invalid", "nombor account salah",
+    "wrong account number", "wrong account", "IC tak match", "details tak betul",
+    "nombor tak boleh guna", "account tidak sah", "salah account", "invalid account"
+  → IMPORTANT: This does NOT mean the bank/wallet TYPE is unsupported.
+  → It means the SPECIFIC detail (number / IC / name) is wrong or invalid.
+  → Do NOT say "bank tak boleh" or "wallet tu tak support" — that is a different issue.
+  → Reply must: clarify the specific detail is wrong/invalid, ask customer to re-confirm correct details.
 
 BONUS_ELIGIBILITY_REQUIRED
   → Customer is asking for bonus / angpao / free credit, but conversation history shows NO CS approval yet.
@@ -346,16 +365,44 @@ IF caseState is WAITING_RECEIPT:
   → Instead: acknowledge you are waiting, or gently remind once if receipt still not received.
   → Example: "Boss, amoi tunggu resit dari boss ya — boleh send sekali?"
 
+IF caseState is RECEIPT_PROVIDED:
+  ❌ BANNED: asking for receipt / screenshot / payment proof again in any form:
+    ("send resit", "boleh send resit", "resit penuh", "screenshot transfer", "bukti bayar",
+     "proof payment", "hantar resit", "attach resit", "upload resit")
+  ✅ MUST DO:
+    1. Acknowledge the receipt has been received / is on hand.
+    2. Confirm you are verifying / forwarding to payment team now.
+    3. Give realistic wait time — "sekejap" or "tunggu sebentar".
+    4. Do NOT ask for more proof unless a clearly specific NEW detail is missing.
+  ✅ EXAMPLE REPLY:
+    "Boss, resit dah amoi terima ya 🙏 Amoi forward ke payment team untuk verify sekarang — tunggu sekejap ya."
+
+IF caseState is INVALID_ACCOUNT_DETAILS:
+  ❌ BANNED: saying the bank type / wallet type is not supported:
+    ("bank tu tak support", "wallet tu tak boleh guna", "platform tu tak accept",
+     "bank tu tak ada", "tak terima bank tu")
+  ✅ MUST DO:
+    1. Clarify clearly: the SPECIFIC detail (account number / IC / name) is invalid or incorrect.
+    2. Ask customer to double-check and re-send the correct detail.
+    3. Be gentle — customer may have made a typo.
+    4. Do NOT blame the bank/wallet — only the specific detail is wrong.
+  ✅ EXAMPLE REPLY:
+    "Boss, yang invalid bukan bank tu ya — tapi nombor account yang boss bagi tak match dalam sistem.
+     Boleh double-check sekali dan send nombor yang betul? 🙏"
+
 IF caseState is BONUS_ELIGIBILITY_REQUIRED:
   ❌ BANNED: "amoi bagi", "confirm dapat", "saya arrange", "boleh dapat angpao/bonus"
+  ❌ ALSO BANNED (do NOT offer to personally check promo on behalf of customer):
+    "amoi check promo", "check kalau ada promo", "amoi tengok promo", "saya check dulu ada promo",
+    "biar amoi check", "amoi check available bonus", "amoi tengok ada bonus tak"
   ✅ MUST DO:
     1. Comfort customer — acknowledge their request warmly, do not dismiss.
     2. Explain: bonus/angpao follows account eligibility and available promos.
-    3. Offer to CHECK if account has an eligible promo (checking is OK, promising is NOT).
-    4. Guide to promotion page if applicable.
+    3. DIRECT to Promotion Page — guide customer to check available promos themselves.
+    4. Do NOT offer to personally check promo for them — always point to the promotion page.
   ✅ EXAMPLE REPLY:
     "Bossku, faham boss nak angpao tu 🙏 tapi angpao memang kena ikut syarat promo/account ya,
-     amoi tak boleh direct bagi kosong. Amoi check dulu ada promo yang layak untuk account boss tak?"
+     amoi tak boleh direct bagi kosong. Boss boleh tengok promotion page — mana yang account layak boleh terus claim ya ❤️"
 
 IF caseState is BONUS_NOT_APPROVED:
   ❌ BANNED: same reward promise phrases, and do NOT re-promise any bonus
@@ -372,7 +419,7 @@ IF caseState is PAYMENT_PENDING or WITHDRAW_PROCESSING:
   → Give a status update: processing, in queue, team is handling.
   → Set realistic expectation without giving a specific time promise.
 
-IF caseState is NEED_CHECK or ESCALATED or BONUS_ELIGIBILITY_REQUIRED or BONUS_NOT_APPROVED:
+IF caseState is NEED_CHECK or ESCALATED or BONUS_NOT_APPROVED:
   → Normal intent strategy applies (see STEP 4 below).
 
 ⚠️ RISK LEVEL RULE FOR BONUS_REQUEST:
@@ -420,22 +467,27 @@ bonus_request / angpao_request:
   → NEVER promise: "amoi bagi", "confirm dapat", "saya arrange bonus", "boleh dapat angpao".
   → riskLevel = MEDIUM at most, even if customer threatens to stop depositing.
 
-  FORMULA: comfort → explain eligibility → offer to check OR guide to promo page
+  FORMULA: comfort → explain eligibility → DIRECT to Promotion Page (do NOT offer to personally check for them)
+
+  ❌ BANNED in bonus_request replies:
+    "amoi check promo", "check kalau ada promo", "amoi tengok promo untuk boss",
+    "saya check ada bonus tak", "biar amoi check", "amoi check dulu ada promo",
+    "amoi check kalau ada bonus available", "let me check promo"
 
   IF customer threatens ("kalau tak bagi tak deposit lagi" / "saya deposit banyak tapi tak bagi"):
     → Acknowledge their feeling warmly. DO NOT reward the threat with a bonus promise.
     → Explain: bonus/angpao follows promo syarat and account eligibility — cannot direct bagi.
-    → Offer to check promotion page for eligible promos.
+    → Direct customer to check the Promotion Page for eligible promos themselves.
 
   ✅ REPLY EXAMPLES:
     "Bossku faham boss nak angpao tu 🙏 tapi angpao memang kena ikut syarat promo/account ya,
-     amoi tak boleh direct bagi kosong. Kalau boss cukup syarat nanti boleh claim dekat promotion page ya ❤️"
+     amoi tak boleh direct bagi kosong. Boss boleh tengok promotion page — mana yang account layak boleh terus claim ya ❤️"
 
     "Faham boss, tapi bonus memang ikut syarat account dan promo yang active ya.
-     Kalau boss nak, boleh check promotion page dulu — mana yang layak boleh terus claim ya 🙏"
+     Boss boleh check promotion page dulu — mana yang layak boleh terus claim ya 🙏"
 
     "Boss jangan kecil hati ya 🙏 bonus bukan tak nak bagi, cuma kena ikut syarat promo/account.
-     Bila cukup syarat, boss boleh claim yang available terus."
+     Bila cukup syarat, boss boleh claim yang available dekat promotion page terus."
 
 game_loss:
   → Acknowledge the loss — use customer's exact words.
@@ -534,6 +586,9 @@ MANDATORY based on caseState:
   → CONFIRMED_BLACKLIST / CLAIM_REJECTED / CASE_CLOSED: best reply MUST NOT say "check" — must explain outcome + offer alternative
   → CUSTOMER_DENYING: best reply re-explains confirmed outcome calmly, no backtracking
   → WAITING_RECEIPT: best reply must NOT re-ask for receipt from scratch — remind gently or confirm waiting
+  → RECEIPT_PROVIDED: best reply MUST acknowledge receipt received + confirm verifying. MUST NOT re-ask for receipt/proof.
+  → INVALID_ACCOUNT_DETAILS: best reply MUST clarify the SPECIFIC DETAIL (number/IC) is wrong — NOT that the bank/wallet type is unsupported. Ask customer to re-confirm correct detail.
+  → BONUS_ELIGIBILITY_REQUIRED: best reply MUST direct customer to Promotion Page. MUST NOT say "amoi check promo" or offer to personally check promo.
 
 MANDATORY based on intent (when caseState = NEED_CHECK):
   → deposit_not_arrived: best reply MUST ask for full receipt details
@@ -631,6 +686,34 @@ caseState: CONFIRMED_BLACKLIST, intent: bonus_request
 ❌ WRONG: "Ok amoi check kalau boleh bagi hadiah" — check not allowed + reward promise
 ✅ CORRECT: "Boss, account ni memang dah kena restriction ya 🙏 Amoi tak boleh bagi angpao atau bonus untuk account yang dah disekat. Kalau masih nak main, boleh register nombor baru."
 
+--- RECEIPT PROVIDED EXAMPLE ---
+
+Scenario: Customer sent "[image]" or "ni resit amoi" — receipt/proof already submitted.
+caseState: RECEIPT_PROVIDED
+❌ WRONG: "Boss boleh send resit penuh ya — amount, masa transfer dan bank sekali"  (re-asking for receipt already received)
+❌ WRONG: "Boss hantar resit clear ya, amoi forward ke team"  (implies receipt not yet received)
+✅ CORRECT: "Boss, resit dah amoi terima ya 🙏 Amoi forward ke payment team untuk verify sekarang — tunggu sekejap ya."
+✅ CORRECT: "Dah ada resit boss 👍 Amoi tengah proses verify dengan payment team, sekejap ya."
+
+--- INVALID ACCOUNT DETAILS EXAMPLE ---
+
+Scenario: Agent said "acc anda invalid" / "nombor account invalid" / "account tidak sah". Customer confused.
+caseState: INVALID_ACCOUNT_DETAILS
+❌ WRONG: "Boss, bank tu tak support / wallet tu tak boleh guna"  (blaming bank type, which is wrong)
+❌ WRONG: "Bank yang boss guna tak boleh terima"  (implying bank is the problem)
+✅ CORRECT: "Boss, yang invalid bukan bank tu ya — tapi nombor account yang boss bagi tak match dalam sistem. Boleh double-check dan send nombor yang betul? 🙏"
+✅ CORRECT: "Boss bagi nombor account yang salah sikit kot 🙏 Bukan bank tu masalah — nombor account yang invalid. Boleh semak balik dan hantar yang betul ya?"
+
+--- BONUS PROMO PAGE EXAMPLE ---
+
+Scenario: Customer asks "ada bonus?" / "kasi angpao la" — no prior CS approval in history.
+caseState: BONUS_ELIGIBILITY_REQUIRED, intent: bonus_request
+❌ WRONG: "Amoi check dulu ada promo yang layak untuk account boss tak?"  (offering to personally check promo)
+❌ WRONG: "Biar amoi tengok promo available untuk boss"  (offering to check on their behalf)
+❌ WRONG: "Amoi check kalau ada bonus"  (same mistake)
+✅ CORRECT: "Bossku, angpao memang kena ikut syarat promo/account ya 🙏 Boss boleh tengok promotion page — mana yang account layak boleh terus claim ya ❤️"
+✅ CORRECT: "Boss, bonus kena ikut eligibility ya 🙏 Amoi tak boleh direct bagi — boss check promotion page dulu, ada banyak promo yang boss boleh claim sendiri."
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FINAL VALIDATION BEFORE RETURNING JSON
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -654,6 +737,18 @@ Before finalizing your JSON output, mentally check ALL of the following:
     → If YES AND no severe threat (serious profanity, self-harm, legal, fraud): riskLevel MUST be MEDIUM or LOW.
     → Do NOT mark HIGH for bonus requests alone. This intent is safe for auto-insert.
     → If any reply promises reward: rewrite to comfort + explain eligibility + guide to promo page.
+
+[ ] RECEIPT PROVIDED CHECK: Is caseState = RECEIPT_PROVIDED?
+    → If YES: ensure NONE of the 3 replies ask for receipt / screenshot / proof again.
+    → Best reply MUST acknowledge receipt received + confirm verifying with payment team.
+
+[ ] INVALID ACCOUNT DETAILS CHECK: Is caseState = INVALID_ACCOUNT_DETAILS?
+    → If YES: ensure replies say the SPECIFIC DETAIL (number/IC) is wrong — NOT that the bank/wallet type is unsupported.
+    → Best reply MUST ask customer to double-check and re-send the correct detail.
+
+[ ] BONUS PROMO PAGE CHECK: Is intent = bonus_request OR caseState = BONUS_ELIGIBILITY_REQUIRED?
+    → If YES: ensure NONE of the 3 replies say "amoi check promo", "check kalau ada promo", or offer to personally check promo.
+    → Best reply MUST direct customer to the Promotion Page to check themselves.
 
 Only return JSON after ALL checks pass.
 `.trim()
@@ -812,7 +907,7 @@ const RESPONSE_SCHEMA = {
     },
     caseState: {
       type: 'string',
-      description: 'Current case state based on full conversation history: NEED_CHECK | WAITING_RECEIPT | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED',
+      description: 'Current case state based on full conversation history: NEED_CHECK | WAITING_RECEIPT | RECEIPT_PROVIDED | PAYMENT_PENDING | CONFIRMED_BLACKLIST | CLAIM_REJECTED | WITHDRAW_PROCESSING | CASE_CLOSED | CUSTOMER_DENYING | ESCALATED | BONUS_ELIGIBILITY_REQUIRED | BONUS_NOT_APPROVED | INVALID_ACCOUNT_DETAILS',
     },
     riskLevel: {
       type: 'string',
@@ -1099,6 +1194,47 @@ All 3 replies must: (1) state the outcome is final, (2) offer new number registr
         if (REWARD_PROMISE_RE.test(r.text)) {
           console.log('[livechat-ai] bonus_request: scrubbed reward promise:', r.text.slice(0, 80))
           return { type: r.type, text: BONUS_SAFE_REPLY, score: r.score }
+        }
+        return r
+      })
+    }
+
+    // ── RECEIPT_PROVIDED: scrub any reply that re-asks for receipt ────────────
+    if (result.caseState === 'RECEIPT_PROVIDED') {
+      const ASK_RECEIPT_RE = /\b(send|hantar|attach|upload)\s+(resit|receipt|screenshot|bukti|proof|slip)\b|resit\s+penuh|bukti\s+bayar|payment\s+proof|boleh\s+send\s+resit|send\s+resit\s+(clear|penuh)/i
+      const RECEIPT_ACK_FALLBACK = 'Boss, resit dah amoi terima ya 🙏 Amoi forward ke payment team untuk verify sekarang — tunggu sekejap ya.'
+      result.replies = result.replies.map(r => {
+        if (ASK_RECEIPT_RE.test(r.text)) {
+          console.log('[livechat-ai] RECEIPT_PROVIDED scrub — replaced re-ask for receipt:', r.text.slice(0, 80))
+          return { type: r.type, text: RECEIPT_ACK_FALLBACK, score: 0 }
+        }
+        return r
+      })
+      const scores = result.replies.map(r => r.score)
+      result.bestReplyIndex = scores.indexOf(Math.max(...scores))
+    }
+
+    // ── INVALID_ACCOUNT_DETAILS: scrub replies that blame bank/wallet type ────
+    if (result.caseState === 'INVALID_ACCOUNT_DETAILS') {
+      const WRONG_BANK_TYPE_RE = /bank\s+(tu|itu|tersebut)\s+tak\s+(support|boleh|guna|accept)|wallet\s+(tu|itu)\s+tak\s+(boleh|support|guna)|platform\s+(tu|itu)\s+tak\s+accept|tak\s+terima\s+bank\s+tu/i
+      const INVALID_DETAIL_FALLBACK = 'Boss, yang invalid bukan bank tu ya 🙏 Nombor account yang boss bagi tak match dalam sistem. Boleh double-check dan send nombor yang betul?'
+      result.replies = result.replies.map(r => {
+        if (WRONG_BANK_TYPE_RE.test(r.text)) {
+          console.log('[livechat-ai] INVALID_ACCOUNT_DETAILS scrub — replaced wrong-bank reply:', r.text.slice(0, 80))
+          return { type: r.type, text: INVALID_DETAIL_FALLBACK, score: 0 }
+        }
+        return r
+      })
+    }
+
+    // ── Bonus: scrub "amoi check promo" type replies ──────────────────────────
+    if (isBonusIntent || result.caseState === 'BONUS_ELIGIBILITY_REQUIRED') {
+      const CHECK_PROMO_RE = /\b(amoi|saya|i|biar\s+amoi)\s+(check|tengok|semak|cek)\s+(promo|bonus|available|ada)\b/i
+      const PROMO_PAGE_REPLY = 'Boss, angpao/bonus memang kena ikut syarat promo ya 🙏 Boss boleh tengok promotion page — mana yang account layak boleh terus claim ya ❤️'
+      result.replies = result.replies.map(r => {
+        if (CHECK_PROMO_RE.test(r.text)) {
+          console.log('[livechat-ai] bonus: scrubbed "check promo" reply:', r.text.slice(0, 80))
+          return { type: r.type, text: PROMO_PAGE_REPLY, score: r.score }
         }
         return r
       })
